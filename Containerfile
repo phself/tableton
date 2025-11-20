@@ -1,4 +1,4 @@
-from registry.redhat.io/rhel9/rhel-bootc:latest
+FROM quay.io/rh-ee-sayash/tableton/rhel9-bootc:latest
 
 #RUN dnf groupinstall -y "Server with GUI" "Virtualization Host"
 
