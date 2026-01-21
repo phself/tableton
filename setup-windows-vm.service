@@ -1,0 +1,15 @@
+[Unit]
+Description=Import Embedded Windows VM
+After=libvirtd.service virtqemud.socket
+Wants=libvirtd.service virtqemud.socket
+# Run only once per system life-cycle ideally
+ConditionFirstBoot=yes
+ConditionPathExists=/var/lib/libvirt/images/windows_server_2012_r2.qcow2
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/setup-windows-vm.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=graphical.target

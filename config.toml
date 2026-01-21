@@ -1,0 +1,28 @@
+[customizations.installer.kickstart]
+contents = """
+lang en_US.UTF-8
+keyboard us
+timezone Asia/Jerusalem
+graphical
+reboot
+
+bootloader --timeout=3
+
+zerombr
+clearpart --all --initlabel --disklabel=gpt
+autopart --type=lvm
+
+rootpw --iscrypted $6$fUNOCXIqXIOlbssz$AZkgV8X2S1AjWeImZ6jv8.puBCcEExKb0NVPxXWX5fFrx7rq43bjKCeZn08sAEPqJx3jGjpHlRn04Z2nkmygV/
+
+network --bootproto=dhcp --device=link --activate --onboot=on --hostname=tableton
+
+# Configure bootc to install from the local embedded container repository.
+#ostreecontainer --transport oci --url /run/install/repo/container
+
+%post --log=/dev/console --erroronfail
+
+# Update the image reference for updates to work correctly.
+bootc switch --mutate-in-place --apply hub-registry.apps.mgmt.cloudlet.tng.topsecret/tableton/tableton:latest
+
+%end
+"""
