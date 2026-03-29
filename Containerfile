@@ -1,16 +1,26 @@
 FROM registry.redhat.io/rhel9/rhel-bootc:latest
 
 # --- Install Packages ---
-RUN dnf -y groupinstall "Server with GUI" "Virtualization Host" && \
-    dnf -y install virt-install \
-                   virt-viewer \
-                   libvirt-client \
-                   libvirt \
-                   qemu-img \
-                   qemu-kvm \
-                   dconf \
-                   gnome-shell-extension-desktop-icons && \
+# 1. Install the core GUI base
+RUN dnf -y groupinstall "Server with GUI" && dnf clean all
+
+# 2. Install the Virtualization components
+RUN dnf -y groupinstall "Virtualization Host" && dnf clean all
+
+# 3. Install the specific tools
+RUN dnf -y install \
+    virt-install \
+    virt-viewer \
+    virt-manager \
+    libvirt-client \
+    libvirt \
+    qemu-img \
+    qemu-kvm \
+    dconf \
+    e2fsprogs \
+    gnome-shell-extension-desktop-icons && \
     dnf clean all
+
 RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.noarch.rpm && \
     dnf -y install 'dnf-command(config-manager)' && \
     dnf config-manager --set-enabled codeready-builder-for-rhel-9-x86_64-rpms && \
@@ -18,24 +28,40 @@ RUN dnf -y install https://dl.fedoraproject.org/pub/epel/epel-release-latest-9.n
     dnf clean all
 
 
-RUN systemctl enable virtqemud.socket libvirtd
+RUN systemctl enable virtqemud.socket libvirtd libvirtd.socket
 RUN systemctl set-default graphical.target
 
+# --- Install Google Chrome ---
+RUN printf "[google-chrome]\n\
+name=google-chrome\n\
+baseurl=https://dl.google.com/linux/chrome/rpm/stable/x86_64\n\
+enabled=1\n\
+gpgcheck=1\n\
+gpgkey=https://dl.google.com/linux/linux_signing_key.pub" > /etc/yum.repos.d/google-chrome.repo && \
+    dnf -y install google-chrome-stable && \
+    dnf clean all
 
-# --- Windows VM Setup ---
-COPY windows_server_2012_r2.qcow2 /var/lib/libvirt/images/windows_server_2012_r2.qcow2
-RUN chown qemu:qemu /var/lib/libvirt/images/windows_server_2012_r2.qcow2 && \
-    chmod 644 /var/lib/libvirt/images/windows_server_2012_r2.qcow2
-    
-COPY setup-windows-vm.sh /usr/local/bin/setup-windows-vm.sh
-RUN chmod +x /usr/local/bin/setup-windows-vm.sh
-COPY setup-windows-vm.service /etc/systemd/system/setup-windows-vm.service
+# Patch Chrome to allow root login and suppress warnings
+RUN sed -i 's|Exec=/usr/bin/google-chrome-stable %U|Exec=/usr/bin/google-chrome-stable %U --no-sandbox --test-type|g' /usr/share/applications/google-chrome.desktop
 
-RUN systemctl enable setup-windows-vm.service
+# ---  Desktop Icons (Root + Global Skeleton) ---
+RUN mkdir -p /root/Desktop /etc/skel/Desktop
 
-RUN mkdir -p /root/Desktop
-COPY files/Windows-VM.sh /root/Desktop/Windows-VM.sh
-RUN chmod +x /root/Desktop/Windows-VM.sh
+# Copy Chrome and Virt-Manager to both Root and New Users
+RUN cp /usr/share/applications/google-chrome.desktop /root/Desktop/ && \
+    cp /usr/share/applications/virt-manager.desktop /root/Desktop/ && \
+    cp /usr/share/applications/google-chrome.desktop /etc/skel/Desktop/ && \
+    cp /usr/share/applications/virt-manager.desktop /etc/skel/Desktop/ && \
+    chmod +x /root/Desktop/*.desktop /etc/skel/Desktop/*.desktop
+
+# Create a startup script that marks desktop icons as trusted on first login
+RUN echo '#!/bin/bash' > /etc/profile.d/trust-desktop-icons.sh && \
+    echo 'if [ -d ~/Desktop ]; then' >> /etc/profile.d/trust-desktop-icons.sh && \
+    echo '  for file in ~/Desktop/*.desktop; do' >> /etc/profile.d/trust-desktop-icons.sh && \
+    echo '    gio set "$file" metadata::trusted true 2>/dev/null' >> /etc/profile.d/trust-desktop-icons.sh && \
+    echo '  done' >> /etc/profile.d/trust-desktop-icons.sh && \
+    echo 'fi' >> /etc/profile.d/trust-desktop-icons.sh && \
+    chmod +x /etc/profile.d/trust-desktop-icons.sh
 
 # --- Unlock Root Login ---
 RUN sed -i 's/^auth.*pam_succeed_if.so.*user != root.*/#&/' /etc/pam.d/gdm-password
