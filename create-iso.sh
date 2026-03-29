@@ -11,4 +11,4 @@ podman run \
     registry.redhat.io/rhel9/bootc-image-builder:latest \
     --type iso \
     --config /config.toml \
-  quay.io/rh-ee-sayash/tableton:latest-chunked
+  quay.io/rh-ee-sayash/tableton:latest

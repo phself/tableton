@@ -8,11 +8,25 @@ reboot
 
 bootloader --timeout=3
 
+# Optimized Partitioning for 2TB Storage
 zerombr
 clearpart --all --initlabel --disklabel=gpt
-autopart --type=lvm
 
-rootpw --iscrypted $6$fUNOCXIqXIOlbssz$AZkgV8X2S1AjWeImZ6jv8.puBCcEExKb0NVPxXWX5fFrx7rq43bjKCeZn08sAEPqJx3jGjpHlRn04Z2nkmygV/
+# 1. EFI Partition (Standard)
+part /boot/efi --fstype="efi"  --size=600
+
+# 2. Boot Partition (Generous for bootc rollbacks)
+part /boot     --fstype="ext4" --size=2048
+
+# 3. Swap Partition (Crucial for running Windows VMs)
+# Since you have 2TB, 16GB of swap is a safe safety net
+part swap      --fstype="swap" --size=16384
+
+# 4. Root Partition (Everything else)
+# This uses the remaining ~1.9 TB
+part /         --fstype="ext4" --size=102400 --grow
+
+rootpw --iscrypted $6$442xLFU3Mvzrl.r9$Ev5jc23HcH44bXlz9TE4NBTndnoUwVBDNA0ULZlQTcMAktfciRRzGfRAIfm8UZokDN1jo02Y16kqiTA98EXRm1
 
 network --bootproto=dhcp --device=link --activate --onboot=on --hostname=tableton
 
